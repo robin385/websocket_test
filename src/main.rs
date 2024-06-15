@@ -1,11 +1,38 @@
 
 mod client;
-
+use hmac::{Hmac, Mac};
+use serde::{Deserialize, Serialize};
+use sha2::Sha256;
 use std::{thread, time::Duration};
 
+use jwt::{token, Header, SignWithKey, Token};
 use websocket::{header::Protocol, sync::Server, ClientBuilder, OwnedMessage};
+#[derive(Default, Deserialize, Serialize)]
+struct Custom {
+    sub: String,
+    rhino: bool,
+}
 
+fn new_token(user_id: &str, password: &str) -> Result<String, &'static str> {
+    // Dummy auth
+    if password != "password" {
+        return Err("Wrong password");
+    }
 
+    let header: Header = Default::default();
+    let claims = Custom {
+        sub: user_id.into(),
+        rhino: true,
+    };
+    let unsigned_token = Token::new(header, claims);
+
+    let key: Hmac<Sha256> = Hmac::new_from_slice(b"secret_key").map_err(|_e| "Invalid key")?;
+
+    let signed_token = unsigned_token
+        .sign_with_key(&key)
+        .map_err(|_e| "Sign error")?;
+    Ok(signed_token.into())
+}
 fn websocket_server() {
 	let server = Server::bind("127.0.0.1:2794").unwrap();
 
@@ -101,6 +128,8 @@ fn main() {
         websocket_server();
     });
     thread::sleep(Duration::from_secs(1));
-    communicate_with_websocket("127.0.0.1:2794", "Hello");
+    //communicate_with_websocket("127.0.0.1:2794", "Hello");
+    let token = new_token("user", "password").unwrap();
+    print!("{}", token);
 }
 
